@@ -1,0 +1,197 @@
+#!/usr/bin/env python
+
+import requests
+from bs4 import BeautifulSoup
+from PyPDF2 import PdfFileMerger
+import HTMLParser
+
+import os
+import sys
+import cgi
+import cStringIO
+import xhtml2pdf.pisa as pisa
+
+from os import listdir
+from os.path import isfile, join
+
+
+MY_PATH = 'temp'
+
+def getCss(href):
+	soup = BeautifulSoup()
+	css = soup.new_tag('link')
+	css['href'] = href
+	css['rel'] = 'stylesheet'
+	css['type'] = 'text/css'
+	return css
+
+def mergePDFs(title, location):
+	merger = PdfFileMerger()
+	mypath = 'temp'
+	pdfs = [ join(MY_PATH,f) for f in listdir(MY_PATH) if isfile(join(MY_PATH,f)) ]
+	for pdf in pdfs:
+		if 'pdf' not in pdf.split('.'):
+			continue
+		file = open(pdf, 'rb')
+		merger.append(file)
+		file.close()
+		os.remove(pdf)
+	output = open(join(location, title + '.pdf'), 'wb')
+	merger.write(output)
+	output.close()
+	return True
+
+def generatePDF(soup, index):
+	data = unicode(soup).encode("utf-8")
+	dest = 'temp/' + str(index) + '.economisttemp' + '.pdf'
+
+
+	pdf = pisa.CreatePDF(
+	    cStringIO.StringIO(data),
+	    file(dest, "wb"),
+	    encoding='utf-8'
+	    )
+
+
+def scrapeArticle(url, header=None):
+	baseUrl = 'http://www.economist.com'
+	r = requests.get(baseUrl + url)
+	doc = r.content
+	soup = BeautifulSoup(doc)
+	hgroup = soup.select('hgroup')
+	content = soup.select('.main-content')[0]
+	if content.aside:
+		content.aside.decompose()
+	soup.head.clear()
+	soup.body.clear()
+	if header:
+		soup.body.append(header)
+	if hgroup:
+		hgroup[0].name = 'span'
+		soup.body.append(hgroup[0])
+
+	soup.body.append(content)
+	css = getCss('style.css')
+	soup.head.append(css)
+	return soup
+
+def contentPage():
+	url = 'http://www.economist.com/printedition/'
+	r = requests.get(url)
+	doc = r.content
+	soup = BeautifulSoup(doc)
+	title = soup.select('#cover-image img')[0]['title']
+	content = soup.select('.view-content')[0]
+	for icon in content.select('.comment-icon'):
+		icon.extract()
+	soup.head.clear()
+	soup.body.clear()
+	header = soup.new_tag('h1')
+	header['class'] = 'edition-title'
+	header.string = title
+	soup.body.append(header)
+	soup.body.append(content)
+
+	css = getCss('content-page.css')
+	soup.head.append(css)
+	return soup
+
+def coverPage(imgUrl):
+	soup = BeautifulSoup()
+	html = soup.new_tag('html')
+	head = soup.new_tag('head')
+	body = soup.new_tag('body')
+	img = soup.new_tag('img', src=imgUrl)
+	img['id'] = 'cover-img'
+	css = getCss('style.css')
+	head.append(css)
+	body.append(img)
+	html.append(head)
+	html.append(body)
+	soup.append(html)
+	return soup
+
+
+def locationPrompt():
+	location = ''
+	while not os.path.exists(location):
+		print 'Please enter a valid directory you me want to store The Economist in: '
+		location = raw_input()
+		if '~' in location:
+			location = location.replace('~', os.environ['HOME'])
+	return location
+
+#main scraper
+
+if os.path.exists('location.txt'):
+	f = open('location.txt', 'r')
+else:
+	f = open('location.txt', 'w')
+	f.close()
+	f = open('location.txt', 'r')
+
+location = f.read()
+f.close()
+
+if location:
+	print 'Press enter if you want me to store The Economist in: ' + location
+	print 'Or type \'change\' if you want to change the path.'
+	user_input = raw_input()
+	if user_input:
+		location = locationPrompt()
+else:
+	location = locationPrompt()
+
+f = open('location.txt', 'w')
+f.write(location)
+f.close()
+
+print 'Scraping, please be patient (this might take a while)'
+print '...'
+fullDoc = []
+
+url = 'http://www.economist.com/printedition/'
+r = requests.get(url)
+doc = r.content
+soup = BeautifulSoup(doc)
+
+
+coverImg = soup.select('#cover-image img')[0]['src']
+issueDate = soup.select('span.issue-date')[0].string
+title = soup.select('#cover-image img')[0]['title']
+
+
+
+fullDoc.append(coverPage(coverImg))
+fullDoc.append(contentPage())
+sections = soup.select('.view-content .section')
+
+for section in sections:
+	header = soup.new_tag('h4')
+	header.string = section.select('h4')[0].string
+	header['class'] = 'header'
+	if header == 'Economit and financial indicators':
+		break
+	for idx, article in enumerate(section.select('.article')):
+		node = article.select('.node-link')[0]
+		if idx == 0:
+			scrapedArticle = scrapeArticle(node['href'], header)
+		else:
+			scrapedArticle = scrapeArticle(node['href'])
+		fullDoc.append(scrapedArticle)
+
+		
+print 'Generating a PDF'
+for idx, page in enumerate(fullDoc):
+	name = join(MY_PATH, str(idx) + '.html')
+	f = open(name, 'w')
+	f.write(unicode(page).encode("utf-8"))
+	f.close()
+	os.remove(join(MY_PATH, str(idx) + '.html'))
+
+	generatePDF(page, idx)
+
+if mergePDFs(title, location):
+	print ''
+	print 'I saved The Economist in: ' + join(location, title) + '.pdf'
+	print 'Enjoy!'

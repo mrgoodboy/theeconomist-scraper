@@ -1,0 +1,79 @@
+@page {
+	size: letter portrait;
+	@frame content_frame {
+		left: 50pt;
+		width: 512pt;
+		top: 50pt;
+		height: 692pt;
+	}
+}
+
+* {
+	font-family: Arial;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	font-size: 1em;
+}
+
+#cover-img {
+	width:512pt;
+	display: block;
+	margin: 0 auto;
+}
+
+
+.header {
+	color: #FF0000;
+	font-style: italic;
+	font-family: Georgia;
+	font-size: 3.4em;
+	line-height: 1em;
+	margin-top: 26px;
+}
+
+.fly-title {
+	color: #e3120b;
+	font: bold 1.5em Arial,Sans-serif;
+}
+
+.headline {
+	font-size: 3.4em;
+	font-weight: bold;
+	font-family: Georgia,serif;
+}
+
+.rubric {
+	font-weight: bold;
+	color: #5b5b5b;
+	font-size: 1.5em;
+	margin-bottom: 2em;
+
+}
+
+
+
+.main-content {
+	font-size: 1.5em;
+	font-weight: normal;
+	font-family: Arial,sans-serif;
+}
+
+
+
+
+.location, .source {
+	color: #7b7b73;
+	font-size: 1.2em;
+	font-weight: normal;
+	font-family: Arial,sans-serif;
+}
+
+.main-content img {
+	display: block;
+}
+
+.xhead {
+	font-weight: bold;
+	margin-bottom: 0;
+}
